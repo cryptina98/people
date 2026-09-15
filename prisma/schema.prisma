@@ -1,0 +1,167 @@
+// People data model.
+//
+// A User is a teammate who can sign in. Everything HR-specific hangs off
+// EmployeeProfile (reporting line, dates, location). Vacation, performance
+// notes and compensation are append-only histories keyed by user.
+//
+// Kept structurally compatible with the People module in Recruiting OS so
+// the two can be merged later.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// ADMIN runs People Ops: sees everyone, comp, approvals. Everyone else is a
+/// MEMBER; manager powers derive from EmployeeProfile.managerId.
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String
+  title       String?
+  image       String?
+  role        Role      @default(MEMBER)
+  timezone    String    @default("UTC")
+  active      Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  profile             EmployeeProfile?
+  reports             EmployeeProfile[]   @relation("manager")
+  vacations           VacationRequest[]   @relation("vacationRequester")
+  decidedVacations    VacationRequest[]   @relation("vacationDecider")
+  performanceNotes    PerformanceNote[]   @relation("performanceSubject")
+  authoredPerfNotes   PerformanceNote[]   @relation("performanceAuthor")
+  compensation        CompensationEvent[] @relation("compensationSubject")
+  grantedCompensation CompensationEvent[] @relation("compensationGranter")
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACTOR
+  INTERN
+}
+
+enum VacationType {
+  VACATION
+  SICK
+  PARENTAL
+  UNPAID
+  OTHER
+}
+
+enum VacationStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
+enum PerformanceNoteKind {
+  CHECK_IN
+  REVIEW
+  FOCUS
+  KUDOS
+  CONCERN
+}
+
+enum CompensationKind {
+  SALARY
+  BONUS
+  EQUITY
+  ADJUSTMENT
+}
+
+model EmployeeProfile {
+  id                String         @id @default(cuid())
+  userId            String         @unique
+  managerId         String?
+  startDate         DateTime?
+  endDate           DateTime?
+  birthday          DateTime?
+  team              String?
+  location          String?
+  country           String?
+  employmentType    EmploymentType @default(FULL_TIME)
+  pronouns          String?
+  phone             String?
+  personalEmail     String?
+  emergencyContact  String?
+  bio               String?
+  achievements      String[]       @default([])
+  currentFocus      String?
+  vacationAllowance Int            @default(25)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manager User? @relation("manager", fields: [managerId], references: [id], onDelete: SetNull)
+}
+
+model VacationRequest {
+  id           String         @id @default(cuid())
+  userId       String
+  type         VacationType   @default(VACATION)
+  status       VacationStatus @default(PENDING)
+  startDate    DateTime
+  endDate      DateTime
+  /// Working days consumed, computed on submission.
+  workingDays  Int
+  note         String?
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user      User  @relation("vacationRequester", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("vacationDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, startDate])
+  @@index([status, startDate])
+}
+
+/// Timestamped notes from team leads about what someone is working on and how
+/// it is going. Edits keep the original timestamp and bump updatedAt.
+model PerformanceNote {
+  id        String              @id @default(cuid())
+  userId    String
+  authorId  String?
+  kind      PerformanceNoteKind @default(CHECK_IN)
+  body      String
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  user   User  @relation("performanceSubject", fields: [userId], references: [id], onDelete: Cascade)
+  author User? @relation("performanceAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model CompensationEvent {
+  id            String           @id @default(cuid())
+  userId        String
+  kind          CompensationKind
+  amount        Decimal          @db.Decimal(14, 2)
+  currency      String           @default("USD")
+  effectiveDate DateTime
+  note          String?
+  grantedById   String?
+  createdAt     DateTime         @default(now())
+
+  user      User  @relation("compensationSubject", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("compensationGranter", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, effectiveDate])
+}
