@@ -34,7 +34,7 @@ export function PersonLink({
     <Link
       href={`/people/${id}`}
       className={cn(
-        "font-medium text-ink underline-offset-4 hover:underline",
+        "-my-3 inline-flex min-h-11 items-center font-medium text-ink underline-offset-4 hover:underline",
         className,
       )}
     >
@@ -157,7 +157,7 @@ export function Tenure({
     return (
       <Link
         href={`/people/${personId}#edit`}
-        className="relative z-10 font-medium text-brand hover:underline"
+        className="relative z-10 -my-3.5 inline-flex min-h-11 items-center font-medium text-brand hover:underline"
       >
         Add start date
       </Link>
@@ -185,28 +185,24 @@ export function PersonCard({
   const line = roleTeamLine(person);
   const location = person.profile?.location;
   return (
-    <article className="surface-interactive relative flex flex-col gap-2 p-4">
+    <article className="surface-interactive relative flex min-w-0 items-center gap-3 px-4 py-3">
       <Link
         href={`/people/${person.id}`}
         className="absolute inset-0 rounded-[14px]"
         aria-label={`Open ${person.name}`}
       />
-      <div className="flex items-center gap-3">
-        <InitialsAvatar name={person.name} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-[16px] leading-tight font-semibold text-ink">
-              {person.name}
-            </p>
-            <StatusPill status={status} />
-          </div>
-          <p className="truncate text-[13px] text-meta">
-            {[line, location].filter(Boolean).join(" · ") || "No role set"}
+      <InitialsAvatar name={person.name} />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="min-w-0 truncate text-[16px] leading-tight font-semibold text-ink">
+            {person.name}
           </p>
+          <StatusPill status={status} />
         </div>
-      </div>
-      <div className="flex items-center gap-2 text-[13px]">
-        <p className="tabular min-w-0 flex-1 truncate text-meta">
+        <p className="truncate text-[13px] text-meta">
+          {[line, location].filter(Boolean).join(" · ") || "No role set"}
+        </p>
+        <p className="tabular truncate text-[13px] text-meta">
           <span className={cn(overdue && "font-semibold text-status-amber")}>
             {lastCheckIn
               ? `Last check-in: ${formatAgo(lastCheckIn)}`
@@ -225,19 +221,19 @@ export function PersonCard({
             </>
           ) : null}
         </p>
-        {canAct ? (
-          <PersonCardActions
-            userId={person.id}
-            name={person.name}
-            status={status}
-            statusReason={person.profile?.statusReason}
-          />
+        {person.profile?.statusReason ? (
+          <p className="truncate text-[13px] text-neutral-600">
+            “{person.profile.statusReason}”
+          </p>
         ) : null}
       </div>
-      {entry.person.profile?.statusReason ? (
-        <p className="truncate text-[13px] text-neutral-600">
-          “{entry.person.profile.statusReason}”
-        </p>
+      {canAct ? (
+        <PersonCardActions
+          userId={person.id}
+          name={person.name}
+          status={status}
+          statusReason={person.profile?.statusReason}
+        />
       ) : null}
     </article>
   );

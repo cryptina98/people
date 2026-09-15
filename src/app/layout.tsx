@@ -31,8 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${sans.variable} text-neutral-900 antialiased`}>
+    <html lang="en" className={sans.variable}>
+      <body className="text-neutral-900 antialiased">
         {children}
         <Toaster position="top-center" />
       </body>

@@ -128,7 +128,10 @@ export default async function PersonPage({
         title={isSelf ? "Me" : person.name}
         subtitle={
           admin ? (
-            <Link href="/people" className="text-brand hover:underline">
+            <Link
+              href="/people"
+              className="-my-3 inline-flex min-h-11 items-center text-brand hover:underline"
+            >
               ← Dashboard
             </Link>
           ) : undefined

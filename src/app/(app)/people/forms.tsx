@@ -353,7 +353,7 @@ export function PersonCardActions({
   const [sheet, setSheet] = useState<"note" | "status" | null>(null);
   const close = () => setSheet(null);
   return (
-    <div className="relative z-10 flex shrink-0 gap-1.5">
+    <div className="relative z-10 -mr-2 flex shrink-0 gap-0.5">
       <button
         type="button"
         onClick={() => setSheet("note")}

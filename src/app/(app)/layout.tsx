@@ -56,7 +56,10 @@ export default async function AppLayout({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex min-h-14 items-center gap-4 bg-ground/95 px-4 backdrop-blur-sm sm:px-6 lg:hidden">
-          <Link href={HOME} className="text-[15px] font-bold text-ink">
+          <Link
+            href={HOME}
+            className="flex min-h-11 items-center text-[15px] font-bold text-ink"
+          >
             People
           </Link>
           <div className="ml-auto flex items-center gap-3">
