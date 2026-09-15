@@ -18,7 +18,7 @@ export default async function OrgChartPage() {
   const unassigned = people.filter((p) => !p.profile?.managerId);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Org chart"
         subtitle="Who reports to whom, and how long everyone has been here. Set “Reports to” on a profile to move people around."

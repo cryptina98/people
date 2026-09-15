@@ -41,7 +41,7 @@ export default async function DirectoryPage({
     : all;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Directory"
         subtitle="Everyone on the team, where they are and how long they have been here."
@@ -50,15 +50,17 @@ export default async function DirectoryPage({
       <form className="flex flex-wrap items-center gap-3">
         <Input
           name="q"
+          type="search"
           placeholder="Search name, title, location, team"
           defaultValue={q ?? ""}
           className="w-full sm:w-80"
         />
-        <label className="flex items-center gap-2 text-sm text-neutral-600">
+        <label className="flex min-h-11 items-center gap-2 text-sm text-neutral-600">
           <AutoSubmitCheckbox
             name="alumni"
             value="1"
             defaultChecked={alumni === "1"}
+            className="size-5 accent-brand"
           />
           Include alumni
         </label>

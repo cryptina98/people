@@ -5,15 +5,18 @@ import type {
   CompensationKind,
   EmploymentType,
   PerformanceNoteKind,
+  PerformanceStatus,
   VacationStatus,
   VacationType,
 } from "@prisma/client";
+import { MessageSquarePlus, Tag } from "lucide-react";
 
 import {
   ActionButton,
   InlineForm,
   PersistentForm,
 } from "@/components/chrome/org-forms";
+import { Sheet } from "@/components/chrome/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +24,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   compensationKindLabels,
   employmentTypeLabels,
+  flaggedStatuses,
   performanceNoteKindLabels,
+  performanceStatusLabels,
+  performanceStatusOrder,
   toDateInputValue,
   vacationTypeLabels,
   workingDaysBetween,
@@ -31,13 +37,30 @@ import {
   addPerformanceNoteAction,
   cancelVacationAction,
   decideVacationAction,
+  setStatusAction,
   submitVacationAction,
   updatePerformanceNoteAction,
   upsertProfileAction,
 } from "@/server/actions/people";
 
 const selectClass =
-  "h-9 w-full rounded-md border border-neutral-200 glass-field px-2 text-sm";
+  "min-h-11 w-full rounded-[10px] border border-neutral-200 bg-white px-3 text-base text-ink outline-none focus-visible:border-brand focus-visible:ring-3 focus-visible:ring-brand/20 md:text-sm";
+
+const statusDot: Record<PerformanceStatus, string> = {
+  ON_TRACK: "bg-status-green",
+  NEEDS_ATTENTION: "bg-status-amber",
+  LEAD_FLAGGED: "bg-status-orange",
+  AT_RISK: "bg-status-red",
+  NEW_JOINER: "bg-status-slate",
+};
+
+const statusHint: Record<PerformanceStatus, string> = {
+  ON_TRACK: "Doing well, nothing needed",
+  NEEDS_ATTENTION: "Worth a follow-up this week",
+  LEAD_FLAGGED: "Their lead asked for support",
+  AT_RISK: "Serious concern, act now",
+  NEW_JOINER: "In their first 90 days",
+};
 
 function Select({
   id,
@@ -78,8 +101,11 @@ export function VacationRequestForm({
 }) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const reversed = Boolean(start && end && end < start);
   const days =
-    start && end ? workingDaysBetween(new Date(start), new Date(end)) : 0;
+    start && end && !reversed
+      ? workingDaysBetween(new Date(start), new Date(end))
+      : 0;
 
   return (
     <InlineForm
@@ -98,10 +124,7 @@ export function VacationRequestForm({
             type="date"
             required
             value={start}
-            onChange={(event) => {
-              setStart(event.target.value);
-              if (!end || event.target.value > end) setEnd(event.target.value);
-            }}
+            onChange={(event) => setStart(event.target.value)}
           />
         </div>
         <div className="space-y-1.5">
@@ -113,10 +136,23 @@ export function VacationRequestForm({
             required
             min={start || undefined}
             value={end}
+            aria-invalid={reversed || undefined}
             onChange={(event) => setEnd(event.target.value)}
           />
         </div>
       </div>
+      {reversed ? (
+        <p className="text-[13px] font-medium text-status-red">
+          “To” must be on or after “From”.
+        </p>
+      ) : days > 0 ? (
+        <p className="tabular text-[13px] text-meta">
+          {days} working day{days === 1 ? "" : "s"}
+          {typeof remaining === "number"
+            ? ` · ${remaining - days} left after this`
+            : ""}
+        </p>
+      ) : null}
       <div className="space-y-1.5">
         <Label htmlFor="type">Type</Label>
         <Select
@@ -134,14 +170,6 @@ export function VacationRequestForm({
           placeholder="Where to, or anything to know"
         />
       </div>
-      <p className="text-xs text-neutral-500">
-        {days > 0
-          ? `${days} working day${days === 1 ? "" : "s"}`
-          : "Pick a date range"}
-        {typeof remaining === "number" && days > 0
-          ? ` · ${remaining - days} left after this`
-          : ""}
-      </p>
     </InlineForm>
   );
 }
@@ -161,15 +189,16 @@ export function VacationDecision({
 }) {
   if (status === "PENDING" && canDecide) {
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-2">
         <ActionButton
-          variant="outline"
+          variant="default"
           action={() => decideVacationAction(requestId, "APPROVED")}
           success="Approved"
         >
           Approve
         </ActionButton>
         <ActionButton
+          variant="outline"
           action={() => decideVacationAction(requestId, "DECLINED")}
           success="Declined"
           confirm="Decline this request?"
@@ -195,30 +224,223 @@ export function VacationDecision({
 
 // --- Performance notes -----------------------------------------------------
 
-export function PerformanceNoteForm({ userId }: { userId: string }) {
+export function PerformanceNoteForm({
+  userId,
+  defaultKind = "CHECK_IN",
+  onSuccess,
+}: {
+  userId: string;
+  defaultKind?: PerformanceNoteKind;
+  onSuccess?: () => void;
+}) {
+  const id = `note-${userId}`;
   return (
     <InlineForm
       action={addPerformanceNoteAction.bind(null, userId)}
       success="Note added"
       submitLabel="Add note"
       className="space-y-3"
+      onSuccess={onSuccess}
     >
       <div className="space-y-1.5">
-        <Label htmlFor="kind">Kind</Label>
+        <Label htmlFor={`${id}-kind`}>Kind</Label>
         <Select
-          id="kind"
+          id={`${id}-kind`}
           name="kind"
-          defaultValue="CHECK_IN"
+          defaultValue={defaultKind}
           options={
             performanceNoteKindLabels as Record<PerformanceNoteKind, string>
           }
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="body">What are they working on, how is it going?</Label>
-        <Textarea id="body" name="body" rows={3} required />
+        <Label htmlFor={`${id}-body`}>
+          What are they working on, how is it going?
+        </Label>
+        <Textarea id={`${id}-body`} name="body" rows={4} required autoFocus />
       </div>
     </InlineForm>
+  );
+}
+
+// --- Performance status ----------------------------------------------------
+
+export function StatusPickerForm({
+  userId,
+  current,
+  currentReason,
+  onSuccess,
+}: {
+  userId: string;
+  current: PerformanceStatus;
+  currentReason?: string | null;
+  onSuccess?: () => void;
+}) {
+  const [picked, setPicked] = useState<PerformanceStatus>(current);
+  const wantsReason = flaggedStatuses.has(picked);
+  return (
+    <InlineForm
+      action={setStatusAction.bind(null, userId)}
+      success="Status updated"
+      submitLabel="Save status"
+      className="space-y-3"
+      onSuccess={onSuccess}
+    >
+      <div role="radiogroup" className="space-y-1.5">
+        {performanceStatusOrder.map((status) => {
+          const selected = picked === status;
+          return (
+            <label
+              key={status}
+              className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 transition-colors ${
+                selected
+                  ? "bg-brand/8 ring-2 ring-brand"
+                  : "hover:bg-neutral-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="status"
+                value={status}
+                checked={selected}
+                onChange={() => setPicked(status)}
+                className="sr-only"
+              />
+              <span
+                className={`size-2.5 shrink-0 rounded-full ${statusDot[status]}`}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-ink">
+                  {performanceStatusLabels[status]}
+                  {status === "LEAD_FLAGGED" ? " — needs support" : ""}
+                </span>
+                <span className="block text-[12px] text-meta">
+                  {statusHint[status]}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      {wantsReason ? (
+        <div className="space-y-1.5">
+          <Label htmlFor={`reason-${userId}`}>Reason (optional)</Label>
+          <Input
+            id={`reason-${userId}`}
+            name="reason"
+            maxLength={200}
+            defaultValue={currentReason ?? ""}
+            placeholder="One line on what’s going on"
+          />
+        </div>
+      ) : null}
+    </InlineForm>
+  );
+}
+
+/** The two one-tap actions on a person card. Each opens a bottom sheet. */
+export function PersonCardActions({
+  userId,
+  name,
+  status,
+  statusReason,
+}: {
+  userId: string;
+  name: string;
+  status: PerformanceStatus;
+  statusReason?: string | null;
+}) {
+  const [sheet, setSheet] = useState<"note" | "status" | null>(null);
+  const close = () => setSheet(null);
+  return (
+    <div className="relative z-10 flex shrink-0 gap-1.5">
+      <button
+        type="button"
+        onClick={() => setSheet("note")}
+        aria-label={`Log check-in for ${name}`}
+        title="Log check-in"
+        className="flex size-11 items-center justify-center rounded-[10px] text-meta hover:bg-neutral-100 hover:text-brand"
+      >
+        <MessageSquarePlus className="size-5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setSheet("status")}
+        aria-label={`Set status for ${name}`}
+        title="Set status"
+        className="flex size-11 items-center justify-center rounded-[10px] text-meta hover:bg-neutral-100 hover:text-brand"
+      >
+        <Tag className="size-5" />
+      </button>
+      <Sheet
+        open={sheet === "note"}
+        onClose={close}
+        title="Log check-in"
+        description={name}
+      >
+        <PerformanceNoteForm userId={userId} onSuccess={close} />
+      </Sheet>
+      <Sheet
+        open={sheet === "status"}
+        onClose={close}
+        title="Set status"
+        description={name}
+      >
+        <StatusPickerForm
+          userId={userId}
+          current={status}
+          currentReason={statusReason}
+          onSuccess={close}
+        />
+      </Sheet>
+    </div>
+  );
+}
+
+/** Profile-page variant: labelled buttons, same sheets. */
+export function ProfileActions({
+  userId,
+  name,
+  status,
+  statusReason,
+}: {
+  userId: string;
+  name: string;
+  status: PerformanceStatus;
+  statusReason?: string | null;
+}) {
+  const [sheet, setSheet] = useState<"note" | "status" | null>(null);
+  const close = () => setSheet(null);
+  return (
+    <div className="grid grid-cols-2 gap-2.5">
+      <Button variant="outline" onClick={() => setSheet("note")}>
+        <MessageSquarePlus /> Log check-in
+      </Button>
+      <Button variant="outline" onClick={() => setSheet("status")}>
+        <Tag /> Set status
+      </Button>
+      <Sheet
+        open={sheet === "note"}
+        onClose={close}
+        title="Add note"
+        description={name}
+      >
+        <PerformanceNoteForm userId={userId} onSuccess={close} />
+      </Sheet>
+      <Sheet
+        open={sheet === "status"}
+        onClose={close}
+        title="Set status"
+        description={name}
+      >
+        <StatusPickerForm
+          userId={userId}
+          current={status}
+          currentReason={statusReason}
+          onSuccess={close}
+        />
+      </Sheet>
+    </div>
   );
 }
 
@@ -235,12 +457,12 @@ export function EditableNoteBody({
   if (!editing) {
     return (
       <div className="space-y-1">
-        <p className="whitespace-pre-wrap text-sm text-neutral-800">{body}</p>
+        <p className="whitespace-pre-wrap text-sm text-ink">{body}</p>
         {editable ? (
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-xs text-neutral-400 hover:text-neutral-700"
+            className="min-h-11 text-[13px] font-medium text-brand hover:underline"
           >
             Edit
           </button>
@@ -266,6 +488,7 @@ export function EditableNoteBody({
         type="button"
         size="sm"
         variant="ghost"
+        className="w-full"
         onClick={() => setEditing(false)}
       >
         Cancel
@@ -367,15 +590,21 @@ export function ProfileForm({
   userId,
   values,
   managers,
+  startOpen = false,
 }: {
   userId: string;
   values: ProfileFormValues;
   managers: { id: string; name: string }[];
+  startOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   if (!open) {
     return (
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={() => setOpen(true)}
+      >
         Edit profile
       </Button>
     );
@@ -530,8 +759,8 @@ export function ProfileForm({
       </Field>
       <Button
         type="button"
-        size="sm"
         variant="ghost"
+        className="w-full"
         onClick={() => setOpen(false)}
       >
         Cancel

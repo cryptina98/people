@@ -21,7 +21,7 @@ const icons: Record<string, LucideIcon> = {
 };
 
 const shortLabels: Record<string, string> = {
-  "/people": "Home",
+  "/people": "Dashboard",
   "/people/org": "Org",
   "/people/directory": "Directory",
 };
@@ -40,31 +40,30 @@ export function MobileNav({ items }: { items: NavItem[] }) {
   };
 
   return (
-    <nav className="glass-panel fixed inset-x-0 bottom-0 z-40 border-t border-white/70 pb-[env(safe-area-inset-bottom)] lg:hidden">
-      <ul className="flex items-stretch overflow-x-auto [scrollbar-width:none]">
+    <nav
+      aria-label="Primary"
+      className="fixed inset-x-0 bottom-0 z-40 bg-white pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-tabbar)] lg:hidden"
+    >
+      <ul className="flex items-stretch">
         {items.map((item) => {
           const Icon = icons[item.href] ?? UserRound;
           const active = isActive(item.href);
           return (
-            <li key={item.href} className="min-w-[4.25rem] flex-1">
+            <li key={item.href} className="min-w-0 flex-1">
               <Link
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium text-neutral-500",
-                  active && "text-neutral-900",
+                  "flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium text-meta",
+                  active && "text-brand",
                 )}
               >
-                <span
-                  className={cn(
-                    "rounded-full px-3 py-0.5",
-                    active && "bg-white/80 ring-1 ring-white",
-                  )}
-                >
-                  <Icon
-                    className="h-4 w-4"
-                    strokeWidth={active ? 2.25 : 1.75}
-                  />
-                </span>
+                <Icon
+                  className="size-6"
+                  strokeWidth={active ? 2.25 : 1.75}
+                  fill={active ? "currentColor" : "none"}
+                  fillOpacity={active ? 0.18 : 0}
+                />
                 <span className="truncate">
                   {shortLabels[item.href] ?? item.label}
                 </span>

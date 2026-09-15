@@ -1,9 +1,12 @@
 import Link from "next/link";
+import type { PerformanceStatus } from "@prisma/client";
 
 import { Card, InitialsAvatar } from "@/components/chrome/page";
 import { formatDate } from "@/lib/format";
 import {
+  formatAgo,
   formatTenure,
+  performanceStatusLabels,
   vacationStatusLabels,
   vacationTypeLabels,
 } from "@/lib/people";
@@ -11,11 +14,12 @@ import { cn } from "@/lib/utils";
 import type {
   OrgNode,
   PersonRow,
+  TriagedPerson,
   UpcomingEvent,
   VacationRow,
 } from "@/server/people";
 
-import { VacationDecision } from "./forms";
+import { PersonCardActions, VacationDecision } from "./forms";
 
 export function PersonLink({
   id,
@@ -30,7 +34,7 @@ export function PersonLink({
     <Link
       href={`/people/${id}`}
       className={cn(
-        "font-medium text-neutral-900 underline-offset-4 hover:underline",
+        "font-medium text-ink underline-offset-4 hover:underline",
         className,
       )}
     >
@@ -43,7 +47,69 @@ export function teamLabel(person: PersonRow) {
   return person.profile?.team ?? "No team";
 }
 
-/** Compact row used in lists and the directory. */
+export function roleTeamLine(person: PersonRow) {
+  return [person.title, person.profile?.team].filter(Boolean).join(" · ");
+}
+
+// --- Status ----------------------------------------------------------------
+
+export const statusTone: Record<
+  PerformanceStatus,
+  { text: string; bg: string; dot: string }
+> = {
+  ON_TRACK: {
+    text: "text-status-green",
+    bg: "bg-status-green-bg",
+    dot: "bg-status-green",
+  },
+  NEEDS_ATTENTION: {
+    text: "text-status-amber",
+    bg: "bg-status-amber-bg",
+    dot: "bg-status-amber",
+  },
+  LEAD_FLAGGED: {
+    text: "text-status-orange",
+    bg: "bg-status-orange-bg",
+    dot: "bg-status-orange",
+  },
+  AT_RISK: {
+    text: "text-status-red",
+    bg: "bg-status-red-bg",
+    dot: "bg-status-red",
+  },
+  NEW_JOINER: {
+    text: "text-status-slate",
+    bg: "bg-status-slate-bg",
+    dot: "bg-status-slate",
+  },
+};
+
+export function StatusPill({
+  status,
+  className,
+}: {
+  status: PerformanceStatus;
+  className?: string;
+}) {
+  const tone = statusTone[status];
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap",
+        tone.text,
+        tone.bg,
+        className,
+      )}
+    >
+      <span className={cn("size-1.5 rounded-full", tone.dot)} />
+      {performanceStatusLabels[status]}
+    </span>
+  );
+}
+
+// --- Person cards ----------------------------------------------------------
+
+/** Compact row used in the directory and other plain lists. */
 export function PersonRowItem({
   person,
   trailing,
@@ -54,93 +120,207 @@ export function PersonRowItem({
   return (
     <Link
       href={`/people/${person.id}`}
-      className="flex items-center gap-3 px-4 py-3 hover:bg-white/60"
+      className="flex min-h-[64px] items-center gap-3 px-4 py-2.5 hover:bg-neutral-50"
     >
       <InitialsAvatar name={person.name} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-neutral-900">
+        <p className="truncate text-[15px] font-semibold text-ink">
           {person.name}
           {!person.active ? (
-            <span className="ml-2 text-xs text-neutral-400">alumni</span>
+            <span className="ml-2 text-xs font-normal text-meta">alumni</span>
           ) : null}
         </p>
-        <p className="truncate text-xs text-neutral-500">
+        <p className="truncate text-[13px] text-meta">
           {[person.title, person.profile?.team, person.profile?.location]
             .filter(Boolean)
             .join(" · ")}
         </p>
       </div>
-      <div className="shrink-0 text-right text-xs text-neutral-500">
-        {trailing ?? formatTenure(person.profile?.startDate)}
+      <div className="tabular shrink-0 text-right text-[13px] text-meta">
+        {trailing ?? <Tenure start={person.profile?.startDate} />}
       </div>
     </Link>
   );
 }
 
-export function StatTile({
-  label,
-  value,
-  hint,
+export function Tenure({
+  start,
+  admin = false,
+  personId,
 }: {
-  label: string;
-  value: React.ReactNode;
-  hint?: string;
+  start: Date | null | undefined;
+  admin?: boolean;
+  personId?: string;
 }) {
+  if (start) return <>{formatTenure(start)}</>;
+  if (admin && personId) {
+    return (
+      <Link
+        href={`/people/${personId}#edit`}
+        className="relative z-10 font-medium text-brand hover:underline"
+      >
+        Add start date
+      </Link>
+    );
+  }
+  return <span>No start date</span>;
+}
+
+/**
+ * The triage card: one row of identity, one row of facts, two actions.
+ * Kept to ~80px on a phone so 4–5 fit on screen.
+ */
+export function PersonCard({
+  entry,
+  upcoming,
+  overdue,
+  canAct,
+}: {
+  entry: TriagedPerson;
+  upcoming?: UpcomingEvent;
+  overdue: boolean;
+  canAct: boolean;
+}) {
+  const { person, status, lastCheckIn } = entry;
+  const line = roleTeamLine(person);
+  const location = person.profile?.location;
   return (
-    <Card className="px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900">
-        {value}
-      </p>
-      {hint ? <p className="text-xs text-neutral-500">{hint}</p> : null}
-    </Card>
+    <article className="surface-interactive relative flex flex-col gap-2 p-4">
+      <Link
+        href={`/people/${person.id}`}
+        className="absolute inset-0 rounded-[14px]"
+        aria-label={`Open ${person.name}`}
+      />
+      <div className="flex items-center gap-3">
+        <InitialsAvatar name={person.name} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[16px] leading-tight font-semibold text-ink">
+              {person.name}
+            </p>
+            <StatusPill status={status} />
+          </div>
+          <p className="truncate text-[13px] text-meta">
+            {[line, location].filter(Boolean).join(" · ") || "No role set"}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-[13px]">
+        <p className="tabular min-w-0 flex-1 truncate text-meta">
+          <span className={cn(overdue && "font-semibold text-status-amber")}>
+            {lastCheckIn
+              ? `Last check-in: ${formatAgo(lastCheckIn)}`
+              : "No check-in yet"}
+          </span>
+          <span className="mx-1.5 text-neutral-300">·</span>
+          <Tenure
+            start={person.profile?.startDate}
+            admin={canAct}
+            personId={person.id}
+          />
+          {upcoming ? (
+            <>
+              <span className="mx-1.5 text-neutral-300">·</span>
+              <span>{eventShortLabel(upcoming)}</span>
+            </>
+          ) : null}
+        </p>
+        {canAct ? (
+          <PersonCardActions
+            userId={person.id}
+            name={person.name}
+            status={status}
+            statusReason={person.profile?.statusReason}
+          />
+        ) : null}
+      </div>
+      {entry.person.profile?.statusReason ? (
+        <p className="truncate text-[13px] text-neutral-600">
+          “{entry.person.profile.statusReason}”
+        </p>
+      ) : null}
+    </article>
   );
 }
 
-const eventTone = {
-  birthday: "border-pink-200 bg-pink-50 text-pink-700",
-  anniversary: "border-indigo-200 bg-indigo-50 text-indigo-700",
-};
+export function eventShortLabel(event: UpcomingEvent) {
+  const when =
+    event.daysUntil === 0
+      ? "today"
+      : event.daysUntil === 1
+        ? "tomorrow"
+        : `in ${event.daysUntil}d`;
+  if (event.kind === "birthday") return `Birthday ${when}`;
+  return `${ordinal(event.count ?? 0)} anniversary ${when}`;
+}
 
-export function UpcomingEventList({ events }: { events: UpcomingEvent[] }) {
+// --- Stats -----------------------------------------------------------------
+
+export function StatTile({
+  label,
+  value,
+  href,
+  tone,
+}: {
+  label: string;
+  value: number;
+  href: string;
+  tone?: "amber" | "red";
+}) {
   return (
-    <Card className="divide-y divide-neutral-100">
+    <Link
+      href={href}
+      className="surface-low flex min-h-[64px] flex-col justify-center px-3 py-2.5 transition-shadow hover:shadow-[var(--shadow-card)]"
+    >
+      <span
+        className={cn(
+          "tabular text-[20px] leading-none font-bold text-ink",
+          value > 0 && tone === "amber" && "text-status-amber",
+          value > 0 && tone === "red" && "text-status-red",
+        )}
+      >
+        {value}
+      </span>
+      <span className="mt-1.5 truncate text-[11px] font-medium text-meta">
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+// --- Upcoming --------------------------------------------------------------
+
+export function UpcomingChips({ events }: { events: UpcomingEvent[] }) {
+  return (
+    <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
       {events.map((event) => (
-        <div
+        <Link
           key={`${event.person.id}-${event.kind}`}
-          className="flex items-center gap-3 px-4 py-3"
+          href={`/people/${event.person.id}`}
+          className="surface-low flex min-h-11 shrink-0 items-center gap-2 px-3 py-1.5"
         >
-          <InitialsAvatar name={event.person.name} size="sm" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm">
-              <PersonLink id={event.person.id} name={event.person.name} />{" "}
-              <span className="text-neutral-500">
-                {event.kind === "birthday"
-                  ? event.count === null
-                    ? "birthday"
-                    : `turns ${event.count}`
-                  : `${ordinal(event.count ?? 0)} anniversary`}
-              </span>
-            </p>
-            <p className="text-xs text-neutral-500">{formatDate(event.date)}</p>
-          </div>
-          <span
-            className={cn(
-              "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-              eventTone[event.kind],
-            )}
-          >
-            {event.daysUntil === 0
-              ? "Today"
-              : event.daysUntil === 1
-                ? "Tomorrow"
-                : `in ${event.daysUntil}d`}
+          <span aria-hidden className="text-sm">
+            {event.kind === "birthday" ? "🎂" : "🎉"}
           </span>
-        </div>
+          <span className="min-w-0">
+            <span className="block max-w-[140px] truncate text-[13px] font-semibold text-ink">
+              {event.person.name.split(" ")[0]}
+            </span>
+            <span className="tabular block text-[11px] text-meta">
+              {event.kind === "birthday"
+                ? "Birthday"
+                : `${ordinal(event.count ?? 0)} anniversary`}
+              {" · "}
+              {event.daysUntil === 0
+                ? "today"
+                : event.daysUntil === 1
+                  ? "tomorrow"
+                  : formatDate(event.date)}
+            </span>
+          </span>
+        </Link>
       ))}
-    </Card>
+    </div>
   );
 }
 
@@ -151,11 +331,13 @@ export function ordinal(n: number) {
   return `${n}${suffix}`;
 }
 
-const statusTone: Record<VacationRow["status"], string> = {
-  PENDING: "border-amber-200 bg-amber-50 text-amber-700",
-  APPROVED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  DECLINED: "border-rose-200 bg-rose-50 text-rose-700",
-  CANCELLED: "border-neutral-200 bg-neutral-50 text-neutral-500",
+// --- Vacations -------------------------------------------------------------
+
+const vacationTone: Record<VacationRow["status"], string> = {
+  PENDING: "bg-status-amber-bg text-status-amber",
+  APPROVED: "bg-status-green-bg text-status-green",
+  DECLINED: "bg-status-red-bg text-status-red",
+  CANCELLED: "bg-neutral-100 text-meta",
 };
 
 export function VacationStatusBadge({
@@ -166,8 +348,8 @@ export function VacationStatusBadge({
   return (
     <span
       className={cn(
-        "rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
-        statusTone[status],
+        "rounded-[6px] px-2 py-0.5 text-[12px] font-semibold whitespace-nowrap",
+        vacationTone[status],
       )}
     >
       {vacationStatusLabels[status]}
@@ -195,11 +377,7 @@ export function VacationList({
   emptyLabel?: string;
 }) {
   if (requests.length === 0) {
-    return (
-      <Card className="px-4 py-6 text-center text-sm text-neutral-500">
-        {emptyLabel}
-      </Card>
-    );
+    return <p className="px-0.5 text-[13px] text-meta">{emptyLabel}</p>;
   }
   return (
     <Card className="divide-y divide-neutral-100">
@@ -221,11 +399,16 @@ export function VacationList({
                   />{" "}
                 </>
               ) : null}
-              <span className={showPerson ? "text-neutral-600" : "font-medium"}>
+              <span
+                className={cn(
+                  "tabular",
+                  showPerson ? "text-neutral-600" : "font-medium",
+                )}
+              >
                 {formatRange(request.startDate, request.endDate)}
               </span>
             </p>
-            <p className="text-xs text-neutral-500">
+            <p className="text-[13px] text-meta">
               {vacationTypeLabels[request.type]} · {request.workingDays} working
               day{request.workingDays === 1 ? "" : "s"}
               {request.note ? ` · ${request.note}` : ""}
@@ -248,6 +431,8 @@ export function VacationList({
   );
 }
 
+// --- Org -------------------------------------------------------------------
+
 /** Nested reporting tree. Indents on wide screens, stacks on mobile. */
 export function OrgTree({
   nodes,
@@ -259,8 +444,8 @@ export function OrgTree({
   return (
     <ul
       className={cn(
-        "space-y-2",
-        depth > 0 && "mt-2 border-l border-neutral-200/80 pl-3 sm:pl-5",
+        "space-y-2.5",
+        depth > 0 && "mt-2.5 border-l-2 border-neutral-200 pl-3 sm:pl-5",
       )}
     >
       {nodes.map((node) => (
@@ -279,23 +464,23 @@ function OrgCard({ person, reports }: { person: PersonRow; reports: number }) {
   return (
     <Link
       href={`/people/${person.id}`}
-      className="glass flex items-center gap-3 rounded-xl border border-white/70 px-3 py-2.5 transition-colors hover:bg-white/80"
+      className="surface-interactive flex min-h-[64px] items-center gap-3 px-4 py-2.5"
     >
       <InitialsAvatar name={person.name} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-neutral-900">
+        <p className="truncate text-[15px] font-semibold text-ink">
           {person.name}
         </p>
-        <p className="truncate text-xs text-neutral-500">
+        <p className="truncate text-[13px] text-meta">
           {[person.title, teamLabel(person)].filter(Boolean).join(" · ")}
         </p>
       </div>
-      <div className="shrink-0 text-right">
-        <p className="text-xs font-medium text-neutral-700">
-          {formatTenure(person.profile?.startDate)}
+      <div className="tabular shrink-0 text-right">
+        <p className="text-[13px] font-medium text-neutral-700">
+          <Tenure start={person.profile?.startDate} />
         </p>
         {reports > 0 ? (
-          <p className="text-[11px] text-neutral-400">
+          <p className="text-[11px] text-meta">
             {reports} report{reports === 1 ? "" : "s"}
           </p>
         ) : null}

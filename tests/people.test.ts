@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   daysUntilAnnual,
+  effectiveStatus,
+  formatAgo,
   nextAnniversaryNumber,
   tenureSince,
+  triageBucket,
   vacationBalance,
   workingDaysBetween,
 } from "@/lib/people";
@@ -14,8 +17,11 @@ import {
   buildOrgTree,
   decideVacation,
   getPerson,
+  lastCheckIns,
   listPeople,
+  setPerformanceStatus,
   submitVacation,
+  triagePeople,
 } from "@/server/people";
 
 import { createUser } from "./factories";
@@ -218,5 +224,103 @@ describe("performance notes and profile visibility", () => {
     await expect(getPerson(peer, ic.id)).rejects.toBeInstanceOf(
       PermissionError,
     );
+  });
+});
+
+describe("status and triage", () => {
+  const today = utc(2026, 9, 15);
+
+  it("defaults to new joiner for 90 days, then on track", () => {
+    expect(effectiveStatus(null, today)).toBe("ON_TRACK");
+    expect(
+      effectiveStatus({ status: null, startDate: utc(2026, 8, 1) }, today),
+    ).toBe("NEW_JOINER");
+    expect(
+      effectiveStatus({ status: null, startDate: utc(2026, 5, 1) }, today),
+    ).toBe("ON_TRACK");
+    expect(
+      effectiveStatus({ status: "AT_RISK", startDate: utc(2026, 9, 1) }, today),
+    ).toBe("AT_RISK");
+  });
+
+  it("buckets flagged first, then overdue by threshold, else good", () => {
+    const opts = { thresholdDays: 30, today };
+    expect(triageBucket({ status: "AT_RISK", lastCheckIn: today }, opts)).toBe(
+      "attention",
+    );
+    expect(triageBucket({ status: "ON_TRACK", lastCheckIn: null }, opts)).toBe(
+      "overdue",
+    );
+    expect(
+      triageBucket({ status: "ON_TRACK", lastCheckIn: utc(2026, 8, 1) }, opts),
+    ).toBe("overdue");
+    expect(
+      triageBucket({ status: "ON_TRACK", lastCheckIn: utc(2026, 9, 1) }, opts),
+    ).toBe("good");
+    expect(
+      triageBucket(
+        { status: "ON_TRACK", lastCheckIn: utc(2026, 8, 1) },
+        { thresholdDays: 60, today },
+      ),
+    ).toBe("good");
+    expect(formatAgo(utc(2026, 8, 1), today)).toBe("6w ago");
+    expect(formatAgo(utc(2026, 9, 3), today)).toBe("12d ago");
+  });
+
+  it("logs status changes with the setter and moves people between sections", async () => {
+    const admin = await createUser("ADMIN");
+    const lead = await createUser("MEMBER");
+    const peer = await createUser("MEMBER");
+    const ic = await createUser("MEMBER");
+    await prisma.employeeProfile.create({
+      data: { userId: ic.id, managerId: lead.id, startDate: utc(2024, 1, 1) },
+    });
+
+    await expect(
+      setPerformanceStatus(peer, { userId: ic.id, status: "AT_RISK" }),
+    ).rejects.toBeInstanceOf(PermissionError);
+
+    let people = (await listPeople()).filter((p) =>
+      [ic.id, lead.id].includes(p.id),
+    );
+    let triage = triagePeople(people, await lastCheckIns(), {
+      thresholdDays: 30,
+    });
+    expect(triage.overdue.map((e) => e.person.id)).toContain(ic.id);
+
+    await addPerformanceNote(lead, {
+      userId: ic.id,
+      kind: "CHECK_IN",
+      body: "All fine.",
+    });
+    people = (await listPeople()).filter((p) => p.id === ic.id);
+    triage = triagePeople(people, await lastCheckIns(), { thresholdDays: 30 });
+    expect(triage.good.map((e) => e.person.id)).toEqual([ic.id]);
+
+    await setPerformanceStatus(lead, {
+      userId: ic.id,
+      status: "LEAD_FLAGGED",
+      reason: "Needs pairing time",
+    });
+    triage = triagePeople(
+      (await listPeople()).filter((p) => p.id === ic.id),
+      await lastCheckIns(),
+      { thresholdDays: 30 },
+    );
+    expect(triage.attention.map((e) => e.status)).toEqual(["LEAD_FLAGGED"]);
+
+    await setPerformanceStatus(admin, { userId: ic.id, status: "ON_TRACK" });
+    const detail = await getPerson(admin, ic.id);
+    expect(detail?.status).toBe("ON_TRACK");
+    expect(detail?.person.profile?.statusReason).toBeNull();
+    expect(detail?.statusHistory.map((c) => c.status)).toEqual([
+      "ON_TRACK",
+      "LEAD_FLAGGED",
+    ]);
+    expect(detail?.statusHistory[1].setBy?.id).toBe(lead.id);
+    expect(detail?.statusHistory[1].reason).toBe("Needs pairing time");
+
+    const asSelf = await getPerson(ic, ic.id);
+    expect(asSelf?.statusHistory).toHaveLength(0);
   });
 });

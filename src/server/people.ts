@@ -1,15 +1,26 @@
-import type { Prisma, VacationStatus, VacationType } from "@prisma/client";
+import type {
+  PerformanceStatus,
+  Prisma,
+  VacationStatus,
+  VacationType,
+} from "@prisma/client";
 
 import type { SessionUser } from "@/lib/auth/user";
+import { env } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import {
   ageOnNextBirthday,
   daysUntilAnnual,
+  effectiveStatus,
+  flaggedStatuses,
   isOutOn,
   nextAnniversaryNumber,
+  performanceStatusOrder,
+  triageBucket,
   utcMidnight,
   vacationBalance,
   workingDaysBetween,
+  type TriageBucket,
 } from "@/lib/people";
 import {
   canManagePeople,
@@ -36,6 +47,61 @@ export async function listPeople(options: { includeInactive?: boolean } = {}) {
     orderBy: [{ active: "desc" }, { name: "asc" }],
     include: personInclude,
   });
+}
+
+/** Most recent check-in note per person. Missing key = never checked in. */
+export async function lastCheckIns(): Promise<Map<string, Date>> {
+  const rows = await prisma.performanceNote.groupBy({
+    by: ["userId"],
+    where: { kind: "CHECK_IN" },
+    _max: { createdAt: true },
+  });
+  return new Map(
+    rows
+      .filter((row) => row._max.createdAt)
+      .map((row) => [row.userId, row._max.createdAt!]),
+  );
+}
+
+export type TriagedPerson = {
+  person: PersonRow;
+  status: PerformanceStatus;
+  lastCheckIn: Date | null;
+  bucket: TriageBucket;
+};
+
+export type Triage = Record<TriageBucket, TriagedPerson[]>;
+
+/**
+ * Splits the active team into the morning sections. Attention is ordered
+ * worst-first, overdue by longest gap (never checked in first).
+ */
+export function triagePeople(
+  people: PersonRow[],
+  checkIns: Map<string, Date>,
+  {
+    thresholdDays = env.checkInThresholdDays,
+    today = new Date(),
+  }: { thresholdDays?: number; today?: Date } = {},
+): Triage {
+  const result: Triage = { attention: [], overdue: [], good: [] };
+  for (const person of people) {
+    if (!person.active) continue;
+    const status = effectiveStatus(person.profile, today);
+    const lastCheckIn = checkIns.get(person.id) ?? null;
+    const bucket = triageBucket(
+      { status, lastCheckIn },
+      { thresholdDays, today },
+    );
+    result[bucket].push({ person, status, lastCheckIn, bucket });
+  }
+  const severity = (status: PerformanceStatus) =>
+    performanceStatusOrder.indexOf(status);
+  result.attention.sort((a, b) => severity(b.status) - severity(a.status));
+  result.overdue.sort(
+    (a, b) => (a.lastCheckIn?.getTime() ?? 0) - (b.lastCheckIn?.getTime() ?? 0),
+  );
+  return result;
 }
 
 export type OrgNode = {
@@ -172,12 +238,21 @@ export async function getPerson(viewer: SessionUser, userId: string) {
   };
   if (!canViewPerson(viewer, target)) throw new PermissionError();
 
-  const [notes, compensation, reports] = await Promise.all([
-    canViewPerformanceNotes(viewer, target)
+  const showNotes = canViewPerformanceNotes(viewer, target);
+  const [notes, statusHistory, compensation, reports] = await Promise.all([
+    showNotes
       ? prisma.performanceNote.findMany({
           where: { userId },
           orderBy: { createdAt: "desc" },
           include: { author: { select: { id: true, name: true } } },
+        })
+      : Promise.resolve([]),
+    showNotes
+      ? prisma.statusChange.findMany({
+          where: { userId },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          include: { setBy: { select: { id: true, name: true } } },
         })
       : Promise.resolve([]),
     canManagePeople(viewer)
@@ -198,7 +273,19 @@ export async function getPerson(viewer: SessionUser, userId: string) {
     person.profile?.vacationAllowance ?? 25,
     person.vacations,
   );
-  return { person, notes, compensation, reports, balance };
+  const status = effectiveStatus(person.profile);
+  const lastCheckIn =
+    notes.find((note) => note.kind === "CHECK_IN")?.createdAt ?? null;
+  return {
+    person,
+    notes,
+    statusHistory,
+    compensation,
+    reports,
+    balance,
+    status,
+    lastCheckIn,
+  };
 }
 
 export type PersonDetail = NonNullable<Awaited<ReturnType<typeof getPerson>>>;
@@ -320,6 +407,49 @@ export async function addPerformanceNote(
   return prisma.performanceNote.create({
     data: { userId: input.userId, authorId: author.id, kind: input.kind, body },
   });
+}
+
+export async function setPerformanceStatus(
+  actor: SessionUser,
+  input: {
+    userId: string;
+    status: PerformanceStatus;
+    reason?: string | null;
+  },
+) {
+  const profile = await prisma.employeeProfile.findUnique({
+    where: { userId: input.userId },
+    select: { managerId: true },
+  });
+  const target = { id: input.userId, managerId: profile?.managerId ?? null };
+  if (!canViewPerformanceNotes(actor, target)) {
+    throw new PermissionError("Only admins or the manager can set a status");
+  }
+  const reason = input.reason?.trim() || null;
+  if (reason && reason.length > 200) {
+    throw new AppError("Keep the reason under 200 characters");
+  }
+  const stamp = {
+    status: input.status,
+    statusReason: flaggedStatuses.has(input.status) ? reason : null,
+    statusSetAt: new Date(),
+    statusSetById: actor.id,
+  };
+  await prisma.$transaction([
+    prisma.employeeProfile.upsert({
+      where: { userId: input.userId },
+      create: { userId: input.userId, ...stamp },
+      update: stamp,
+    }),
+    prisma.statusChange.create({
+      data: {
+        userId: input.userId,
+        status: input.status,
+        reason: stamp.statusReason,
+        setById: actor.id,
+      },
+    }),
+  ]);
 }
 
 export async function updatePerformanceNote(

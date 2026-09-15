@@ -20,23 +20,23 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="glass-panel sticky top-0 hidden h-screen w-60 shrink-0 flex-col justify-between border-r border-white/70 px-4 py-6 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col justify-between px-4 py-6 lg:flex">
         <div className="space-y-8">
           <Link href={HOME} className="block px-2.5">
-            <p className="text-sm font-semibold tracking-tight">People</p>
-            <p className="text-[11px] text-neutral-400">
+            <p className="text-[15px] font-bold text-ink">People</p>
+            <p className="text-[11px] text-meta">
               One source of truth about the team
             </p>
           </Link>
           <SidebarNav items={items} />
         </div>
 
-        <div className="space-y-3 border-t border-white/70 pt-4">
+        <div className="space-y-3 pt-4">
           <div className="flex items-center gap-2 px-1">
             <InitialsAvatar name={user.name} size="sm" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{user.name}</p>
-              <p className="truncate text-[11px] text-neutral-400">
+              <p className="truncate text-[11px] text-meta">
                 {roleLabels[user.role]}
               </p>
             </div>
@@ -46,7 +46,7 @@ export default async function AppLayout({
               type="submit"
               variant="ghost"
               size="sm"
-              className="w-full justify-start text-neutral-500"
+              className="w-full justify-start"
             >
               Sign out
             </Button>
@@ -55,8 +55,8 @@ export default async function AppLayout({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass-panel sticky top-0 z-40 flex items-center gap-4 border-b border-white/70 px-4 py-3 sm:px-6 lg:hidden">
-          <Link href={HOME} className="text-sm font-semibold">
+        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-4 bg-ground/95 px-4 backdrop-blur-sm sm:px-6 lg:hidden">
+          <Link href={HOME} className="text-[15px] font-bold text-ink">
             People
           </Link>
           <div className="ml-auto flex items-center gap-3">
@@ -65,17 +65,21 @@ export default async function AppLayout({
                 type="submit"
                 variant="ghost"
                 size="sm"
-                className="text-neutral-500"
+                className="text-meta"
               >
                 Sign out
               </Button>
             </form>
-            <Link href="/people/me" aria-label="Me">
+            <Link
+              href="/people/me"
+              aria-label="Me"
+              className="flex size-11 items-center justify-center"
+            >
               <InitialsAvatar name={user.name} size="sm" />
             </Link>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 pb-24 sm:px-6 sm:py-8 lg:px-10 lg:py-10 lg:pb-10">
+        <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 pt-2 pb-28 sm:px-6 sm:pt-4 lg:px-10 lg:py-10">
           {children}
         </main>
         <MobileNav items={items} />

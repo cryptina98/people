@@ -31,9 +31,8 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
             <Link
               href={item.href}
               className={cn(
-                "flex items-center rounded-md px-2.5 py-1.5 text-neutral-600 transition-colors hover:bg-white/70 hover:text-neutral-900",
-                isActive(item.href) &&
-                  "bg-white/80 font-medium text-neutral-900 shadow-[0_1px_2px_oklch(0.42_0.09_262/0.12)] ring-1 ring-white",
+                "flex min-h-10 items-center rounded-[10px] px-3 text-neutral-600 transition-colors hover:bg-white hover:text-ink",
+                isActive(item.href) && "surface-low font-semibold text-brand",
               )}
             >
               {item.label}

@@ -2,11 +2,108 @@ import type {
   CompensationKind,
   EmploymentType,
   PerformanceNoteKind,
+  PerformanceStatus,
   VacationStatus,
   VacationType,
 } from "@prisma/client";
 
 const DAY = 24 * 60 * 60 * 1000;
+
+export const performanceStatusLabels: Record<PerformanceStatus, string> = {
+  ON_TRACK: "On track",
+  NEEDS_ATTENTION: "Needs attention",
+  LEAD_FLAGGED: "Lead flagged",
+  AT_RISK: "At risk",
+  NEW_JOINER: "New joiner",
+};
+
+/** Order used by status pickers and when sorting the attention list. */
+export const performanceStatusOrder: PerformanceStatus[] = [
+  "ON_TRACK",
+  "NEEDS_ATTENTION",
+  "LEAD_FLAGGED",
+  "AT_RISK",
+  "NEW_JOINER",
+];
+
+export const flaggedStatuses = new Set<PerformanceStatus>([
+  "NEEDS_ATTENTION",
+  "LEAD_FLAGGED",
+  "AT_RISK",
+]);
+
+export const NEW_JOINER_DAYS = 90;
+export const DEFAULT_CHECK_IN_DAYS = 30;
+
+/**
+ * The status shown for a person. An explicit status always wins; otherwise
+ * people in their first 90 days are new joiners and everyone else is on track.
+ */
+export function effectiveStatus(
+  profile: {
+    status: PerformanceStatus | null;
+    startDate: Date | null;
+  } | null,
+  today = new Date(),
+): PerformanceStatus {
+  if (profile?.status) return profile.status;
+  if (
+    profile?.startDate &&
+    daysBetween(profile.startDate, today) < NEW_JOINER_DAYS
+  ) {
+    return "NEW_JOINER";
+  }
+  return "ON_TRACK";
+}
+
+export function daysBetween(from: Date, to: Date): number {
+  return Math.floor(
+    (utcMidnight(to).getTime() - utcMidnight(from).getTime()) / DAY,
+  );
+}
+
+/** "today", "12d ago", "6w ago", "4mo ago" — coarse, for scanning. */
+export function formatAgo(date: Date, today = new Date()): string {
+  const days = daysBetween(date, today);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 14) return `${days}d ago`;
+  if (days < 60) return `${Math.floor(days / 7)}w ago`;
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
+export type TriageBucket = "attention" | "overdue" | "good";
+
+export type TriageInput = {
+  status: PerformanceStatus;
+  lastCheckIn: Date | null;
+};
+
+/**
+ * Flagged statuses need attention; anyone else without a recent check-in is
+ * overdue; the rest are fine. Buckets are exclusive so a person appears once.
+ */
+export function triageBucket(
+  input: TriageInput,
+  { thresholdDays = DEFAULT_CHECK_IN_DAYS, today = new Date() } = {},
+): TriageBucket {
+  if (flaggedStatuses.has(input.status)) return "attention";
+  if (
+    !input.lastCheckIn ||
+    daysBetween(input.lastCheckIn, today) > thresholdDays
+  ) {
+    return "overdue";
+  }
+  return "good";
+}
+
+export function isCheckInOverdue(
+  lastCheckIn: Date | null,
+  { thresholdDays = DEFAULT_CHECK_IN_DAYS, today = new Date() } = {},
+) {
+  return !lastCheckIn || daysBetween(lastCheckIn, today) > thresholdDays;
+}
 
 export const employmentTypeLabels: Record<EmploymentType, string> = {
   FULL_TIME: "Full-time",
@@ -94,7 +191,7 @@ export function formatTenure(
   start: Date | null | undefined,
   today = new Date(),
 ) {
-  if (!start) return "—";
+  if (!start) return "No start date";
   const { years, months } = tenureSince(start, today);
   if (years === 0 && months === 0) return "just joined";
   const parts: string[] = [];

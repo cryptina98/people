@@ -16,7 +16,14 @@ export const env = {
   allowedGoogleDomains: list(process.env.ALLOWED_GOOGLE_DOMAINS),
   adminEmails: list(process.env.ADMIN_EMAILS),
   devAuthEnabled: process.env.DEV_AUTH_ENABLED === "true",
+  /** Days without a check-in note before someone shows as overdue. */
+  checkInThresholdDays: positiveInt(process.env.CHECK_IN_THRESHOLD_DAYS, 30),
 };
+
+function positiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 export const googleOauthConfigured = Boolean(
   env.google.clientId && env.google.clientSecret,

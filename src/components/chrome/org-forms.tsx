@@ -28,37 +28,42 @@ function useRun() {
   return { pending, run };
 }
 
-/** Small inline form that resets itself after a successful action. */
+/** Form that resets itself after a successful action. */
 export function InlineForm({
   action,
   success,
   submitLabel,
   children,
   className,
+  onSuccess,
 }: {
   action: (formData: FormData) => Promise<ActionResult<unknown>>;
   success?: string;
   submitLabel: string;
   children: ReactNode;
   className?: string;
+  onSuccess?: () => void;
 }) {
   const { pending, run } = useRun();
   const formRef = useRef<HTMLFormElement>(null);
   return (
     <form
       ref={formRef}
-      className={className ?? "flex flex-wrap items-end gap-2"}
+      className={className ?? "space-y-3"}
       action={(formData) =>
         run(
           () => action(formData),
           success,
-          () => formRef.current?.reset(),
+          () => {
+            formRef.current?.reset();
+            onSuccess?.();
+          },
         )
       }
     >
       {children}
-      <Button type="submit" size="sm" variant="outline" disabled={pending}>
-        {submitLabel}
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? "Saving…" : submitLabel}
       </Button>
     </form>
   );
@@ -85,8 +90,8 @@ export function PersistentForm({
       action={(formData) => run(() => action(formData), success)}
     >
       {children}
-      <Button type="submit" size="sm" disabled={pending}>
-        {submitLabel}
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? "Saving…" : submitLabel}
       </Button>
     </form>
   );
@@ -98,18 +103,21 @@ export function ActionButton({
   children,
   variant = "ghost",
   confirm,
+  className,
 }: {
   action: () => Promise<ActionResult<unknown>>;
   success?: string;
   children: ReactNode;
-  variant?: "ghost" | "outline" | "default";
+  variant?: "ghost" | "outline" | "default" | "destructive";
   confirm?: string;
+  className?: string;
 }) {
   const { pending, run } = useRun();
   return (
     <Button
       size="sm"
       variant={variant}
+      className={className}
       disabled={pending}
       onClick={() => {
         if (confirm && !window.confirm(confirm)) return;

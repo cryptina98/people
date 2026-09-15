@@ -44,6 +44,8 @@ model User {
   authoredPerfNotes   PerformanceNote[]   @relation("performanceAuthor")
   compensation        CompensationEvent[] @relation("compensationSubject")
   grantedCompensation CompensationEvent[] @relation("compensationGranter")
+  statusChanges       StatusChange[]      @relation("statusSubject")
+  setStatusChanges    StatusChange[]      @relation("statusSetter")
 }
 
 enum EmploymentType {
@@ -76,6 +78,17 @@ enum PerformanceNoteKind {
   CONCERN
 }
 
+/// Traffic-light performance status shown on the morning dashboard. Unset
+/// means "nobody has said otherwise": new joiners (< 90 days) derive
+/// NEW_JOINER, everyone else ON_TRACK.
+enum PerformanceStatus {
+  ON_TRACK
+  NEEDS_ATTENTION
+  LEAD_FLAGGED
+  AT_RISK
+  NEW_JOINER
+}
+
 enum CompensationKind {
   SALARY
   BONUS
@@ -84,8 +97,8 @@ enum CompensationKind {
 }
 
 model EmployeeProfile {
-  id                String         @id @default(cuid())
-  userId            String         @unique
+  id                String             @id @default(cuid())
+  userId            String             @unique
   managerId         String?
   startDate         DateTime?
   endDate           DateTime?
@@ -93,17 +106,21 @@ model EmployeeProfile {
   team              String?
   location          String?
   country           String?
-  employmentType    EmploymentType @default(FULL_TIME)
+  employmentType    EmploymentType     @default(FULL_TIME)
   pronouns          String?
   phone             String?
   personalEmail     String?
   emergencyContact  String?
   bio               String?
-  achievements      String[]       @default([])
+  achievements      String[]           @default([])
   currentFocus      String?
-  vacationAllowance Int            @default(25)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  vacationAllowance Int                @default(25)
+  status            PerformanceStatus?
+  statusReason      String?
+  statusSetAt       DateTime?
+  statusSetById     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   manager User? @relation("manager", fields: [managerId], references: [id], onDelete: SetNull)
@@ -145,6 +162,22 @@ model PerformanceNote {
 
   user   User  @relation("performanceSubject", fields: [userId], references: [id], onDelete: Cascade)
   author User? @relation("performanceAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+/// Append-only log of status changes so the dashboard can show who set a
+/// status and when, and the profile can show the trend.
+model StatusChange {
+  id        String            @id @default(cuid())
+  userId    String
+  status    PerformanceStatus
+  reason    String?
+  setById   String?
+  createdAt DateTime          @default(now())
+
+  user  User  @relation("statusSubject", fields: [userId], references: [id], onDelete: Cascade)
+  setBy User? @relation("statusSetter", fields: [setById], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
 }

@@ -45,10 +45,8 @@ export default async function LoginPage({
       <div className="grid w-full gap-12 md:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-8">
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-neutral-400">
-              People
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
+            <p className="text-[13px] font-semibold text-brand">People</p>
+            <h1 className="text-[28px] leading-tight font-bold text-ink">
               Sign in to the team directory
             </h1>
             <p className="max-w-md text-sm text-neutral-500">
@@ -62,7 +60,7 @@ export default async function LoginPage({
           </div>
 
           {message ? (
-            <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <p className="rounded-[10px] bg-status-red-bg px-3 py-2 text-sm text-status-red">
               {message}
             </p>
           ) : null}
@@ -105,8 +103,8 @@ export default async function LoginPage({
         </div>
 
         {devAccounts.length > 0 ? (
-          <aside className="glass rounded-xl border border-white/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <aside className="surface p-4">
+            <p className="text-[15px] font-semibold text-ink">
               Seeded accounts
             </p>
             <ul className="mt-3 space-y-2">
@@ -116,12 +114,12 @@ export default async function LoginPage({
                     <input type="hidden" name="email" value={account.email} />
                     <button
                       type="submit"
-                      className="w-full rounded-md px-2 py-1.5 text-left hover:bg-neutral-50"
+                      className="min-h-11 w-full rounded-[10px] px-2 py-1.5 text-left hover:bg-neutral-50"
                     >
-                      <span className="block font-medium text-neutral-800">
+                      <span className="block font-medium text-ink">
                         {account.name}
                       </span>
-                      <span className="block text-xs text-neutral-500">
+                      <span className="block text-xs text-meta">
                         {roleLabels[account.role]} · {account.email}
                       </span>
                     </button>

@@ -5,6 +5,7 @@ import type {
   CompensationKind,
   EmploymentType,
   PerformanceNoteKind,
+  PerformanceStatus,
   VacationType,
 } from "@prisma/client";
 
@@ -22,9 +23,11 @@ import {
   addPerformanceNote,
   cancelVacation,
   decideVacation,
+  setPerformanceStatus,
   submitVacation,
   updatePerformanceNote,
 } from "@/server/people";
+import { performanceStatusLabels } from "@/lib/people";
 
 function revalidatePeople() {
   revalidatePath("/people", "layout");
@@ -172,6 +175,28 @@ export async function updatePerformanceNoteAction(
       noteId,
       String(formData.get("body") ?? ""),
     );
+    revalidatePeople();
+    return undefined;
+  });
+}
+
+// --- Performance status ----------------------------------------------------
+
+export async function setStatusAction(
+  userId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireApiUser();
+    const status = optionalString(formData.get("status"));
+    if (!status || !(status in performanceStatusLabels)) {
+      throw new AppError("Pick a status");
+    }
+    await setPerformanceStatus(user, {
+      userId,
+      status: status as PerformanceStatus,
+      reason: optionalString(formData.get("reason")),
+    });
     revalidatePeople();
     return undefined;
   });
