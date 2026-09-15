@@ -185,7 +185,7 @@ export function PersonCard({
   const line = roleTeamLine(person);
   const location = person.profile?.location;
   return (
-    <article className="surface-interactive relative flex min-w-0 items-center gap-3 px-4 py-3">
+    <article className="surface-interactive relative flex min-w-0 items-center gap-3 px-4 py-2.5">
       <Link
         href={`/people/${person.id}`}
         className="absolute inset-0 rounded-[14px]"
@@ -201,31 +201,42 @@ export function PersonCard({
         </div>
         <p className="truncate text-[13px] text-meta">
           {[line, location].filter(Boolean).join(" · ") || "No role set"}
+          {person.profile?.statusReason ? (
+            <span className="text-neutral-600">
+              {" · “"}
+              {person.profile.statusReason}
+              {"”"}
+            </span>
+          ) : null}
         </p>
-        <p className="tabular truncate text-[13px] text-meta">
-          <span className={cn(overdue && "font-semibold text-status-amber")}>
+        <p className="tabular flex min-w-0 items-center text-[13px] whitespace-nowrap text-meta">
+          <span
+            className={cn(
+              "shrink-0",
+              overdue && "font-semibold text-status-amber",
+            )}
+          >
             {lastCheckIn
               ? `Last check-in: ${formatAgo(lastCheckIn)}`
               : "No check-in yet"}
           </span>
-          <span className="mx-1.5 text-neutral-300">·</span>
-          <Tenure
-            start={person.profile?.startDate}
-            admin={canAct}
-            personId={person.id}
-          />
+          <span className="mx-1.5 shrink-0 text-neutral-300">·</span>
+          <span className="shrink-0">
+            <Tenure
+              start={person.profile?.startDate}
+              admin={canAct}
+              personId={person.id}
+            />
+          </span>
           {upcoming ? (
             <>
-              <span className="mx-1.5 text-neutral-300">·</span>
-              <span>{eventShortLabel(upcoming)}</span>
+              <span className="mx-1.5 shrink-0 text-neutral-300">·</span>
+              <span className="min-w-0 truncate">
+                {eventShortLabel(upcoming)}
+              </span>
             </>
           ) : null}
         </p>
-        {person.profile?.statusReason ? (
-          <p className="truncate text-[13px] text-neutral-600">
-            “{person.profile.statusReason}”
-          </p>
-        ) : null}
       </div>
       {canAct ? (
         <PersonCardActions

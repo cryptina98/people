@@ -462,7 +462,7 @@ export function EditableNoteBody({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="min-h-11 text-[13px] font-medium text-brand hover:underline"
+            className="-mx-3 min-h-11 min-w-11 px-3 text-[13px] font-medium text-brand hover:underline"
           >
             Edit
           </button>
