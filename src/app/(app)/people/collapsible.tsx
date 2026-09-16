@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 /** Collapsed-by-default section body behind a "Show all (n)" toggle. */
 export function Collapsible({
   count,
+  label,
   children,
 }: {
   count: number;
+  label?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -28,7 +30,7 @@ export function Collapsible({
           </>
         ) : (
           <>
-            Show all ({count}) <ChevronDown />
+            {label ?? "Show all"} ({count}) <ChevronDown />
           </>
         )}
       </Button>

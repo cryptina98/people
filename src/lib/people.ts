@@ -73,7 +73,7 @@ export function formatAgo(date: Date, today = new Date()): string {
   return `${Math.floor(days / 365)}y ago`;
 }
 
-export type TriageBucket = "attention" | "overdue" | "good";
+export type TriageBucket = "attention" | "overdue" | "unstarted" | "good";
 
 export type TriageInput = {
   status: PerformanceStatus;
@@ -81,20 +81,18 @@ export type TriageInput = {
 };
 
 /**
- * Flagged statuses need attention; anyone else without a recent check-in is
- * overdue; the rest are fine. Buckets are exclusive so a person appears once.
+ * Flagged statuses need attention; a stale check-in is overdue; people who
+ * have never had a check-in are "unstarted" (kept out of the overdue wall so
+ * a fresh roster doesn't start with everyone flagged); the rest are fine.
+ * Buckets are exclusive so a person appears once.
  */
 export function triageBucket(
   input: TriageInput,
   { thresholdDays = DEFAULT_CHECK_IN_DAYS, today = new Date() } = {},
 ): TriageBucket {
   if (flaggedStatuses.has(input.status)) return "attention";
-  if (
-    !input.lastCheckIn ||
-    daysBetween(input.lastCheckIn, today) > thresholdDays
-  ) {
-    return "overdue";
-  }
+  if (!input.lastCheckIn) return "unstarted";
+  if (daysBetween(input.lastCheckIn, today) > thresholdDays) return "overdue";
   return "good";
 }
 
@@ -102,7 +100,7 @@ export function isCheckInOverdue(
   lastCheckIn: Date | null,
   { thresholdDays = DEFAULT_CHECK_IN_DAYS, today = new Date() } = {},
 ) {
-  return !lastCheckIn || daysBetween(lastCheckIn, today) > thresholdDays;
+  return !!lastCheckIn && daysBetween(lastCheckIn, today) > thresholdDays;
 }
 
 export const employmentTypeLabels: Record<EmploymentType, string> = {

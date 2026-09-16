@@ -243,13 +243,13 @@ describe("status and triage", () => {
     ).toBe("AT_RISK");
   });
 
-  it("buckets flagged first, then overdue by threshold, else good", () => {
+  it("buckets flagged first, then overdue by threshold, never-checked-in apart, else good", () => {
     const opts = { thresholdDays: 30, today };
     expect(triageBucket({ status: "AT_RISK", lastCheckIn: today }, opts)).toBe(
       "attention",
     );
     expect(triageBucket({ status: "ON_TRACK", lastCheckIn: null }, opts)).toBe(
-      "overdue",
+      "unstarted",
     );
     expect(
       triageBucket({ status: "ON_TRACK", lastCheckIn: utc(2026, 8, 1) }, opts),
@@ -286,7 +286,8 @@ describe("status and triage", () => {
     let triage = triagePeople(people, await lastCheckIns(), {
       thresholdDays: 30,
     });
-    expect(triage.overdue.map((e) => e.person.id)).toContain(ic.id);
+    expect(triage.unstarted.map((e) => e.person.id)).toContain(ic.id);
+    expect(triage.overdue).toHaveLength(0);
 
     await addPerformanceNote(lead, {
       userId: ic.id,

@@ -84,7 +84,12 @@ export function triagePeople(
     today = new Date(),
   }: { thresholdDays?: number; today?: Date } = {},
 ): Triage {
-  const result: Triage = { attention: [], overdue: [], good: [] };
+  const result: Triage = {
+    attention: [],
+    overdue: [],
+    unstarted: [],
+    good: [],
+  };
   for (const person of people) {
     if (!person.active) continue;
     const status = effectiveStatus(person.profile, today);

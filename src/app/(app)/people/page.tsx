@@ -4,6 +4,7 @@ import { EmptyState, PageHeader, Section } from "@/components/chrome/page";
 import { requireUser } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
 import { canManagePeople } from "@/lib/permissions";
+import { buildTeamPalette } from "@/lib/team-color";
 import {
   lastCheckIns,
   listPeople,
@@ -42,6 +43,7 @@ export default async function PeoplePage() {
   ]);
   const now = new Date();
   const triage = triagePeople(people, checkIns, { today: now });
+  const palette = buildTeamPalette(people.map((p) => p.profile?.team));
   const events = upcomingEvents(people, { withinDays: 30, today: now });
   const nextEvent = new Map<string, UpcomingEvent>();
   for (const event of events) {
@@ -55,8 +57,9 @@ export default async function PeoplePage() {
           key={entry.person.id}
           entry={entry}
           upcoming={nextEvent.get(entry.person.id)}
-          overdue={overdue || entry.lastCheckIn === null}
+          overdue={overdue}
           canAct
+          palette={palette}
         />
       ))}
     </div>
@@ -120,10 +123,31 @@ export default async function PeoplePage() {
         description={`No check-in note in the last ${env.checkInThresholdDays} days.`}
       >
         {triage.overdue.length === 0 ? (
-          <EmptyState title="Everyone has had a recent check-in" />
+          <EmptyState
+            title={
+              triage.unstarted.length > 0
+                ? "Nobody's check-in has gone stale"
+                : "Everyone has had a recent check-in"
+            }
+          />
         ) : (
           cards(triage.overdue, true)
         )}
+        {triage.unstarted.length > 0 ? (
+          <div className="mt-3 space-y-2.5">
+            <p className="text-[13px] text-meta">
+              {triage.unstarted.length} people haven&apos;t had a first check-in
+              logged yet — they&apos;ll show up here once their last one is
+              older than {env.checkInThresholdDays} days.
+            </p>
+            <Collapsible
+              count={triage.unstarted.length}
+              label="Show people without a check-in"
+            >
+              {cards(triage.unstarted, false)}
+            </Collapsible>
+          </div>
+        ) : null}
       </Section>
 
       <Section id="coming-up" title="Coming up" count={events.length}>

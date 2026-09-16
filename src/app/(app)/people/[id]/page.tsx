@@ -31,13 +31,14 @@ import {
   PermissionError,
 } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { buildTeamPalette } from "@/lib/team-color";
 import { getPerson } from "@/server/people";
 
 import {
   ordinal,
   PersonLink,
   StatusPill,
-  teamLabel,
+  TeamTag,
   Tenure,
   VacationList,
 } from "../components";
@@ -107,6 +108,13 @@ export default async function PersonPage({
       })
     : [];
 
+  const teams = await prisma.employeeProfile.findMany({
+    where: { team: { not: null }, user: { active: true } },
+    select: { team: true },
+    distinct: ["team"],
+  });
+  const palette = buildTeamPalette(teams.map((t) => t.team));
+
   const today = new Date();
   const upcoming = person.vacations.filter(
     (v) =>
@@ -152,10 +160,11 @@ export default async function PersonPage({
                 <span className="text-xs text-meta">alumni</span>
               ) : null}
             </div>
-            <p className="text-[13px] text-meta">
-              {[person.title, teamLabel(person), profile?.pronouns]
-                .filter(Boolean)
-                .join(" · ")}
+            <p className="flex flex-wrap items-center gap-1.5 text-[13px] text-meta">
+              <TeamTag team={profile?.team} palette={palette} />
+              <span>
+                {[person.title, profile?.pronouns].filter(Boolean).join(" · ")}
+              </span>
             </p>
             <p className="text-[13px] text-meta">{person.email}</p>
           </div>

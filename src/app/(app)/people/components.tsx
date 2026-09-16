@@ -10,9 +10,9 @@ import {
   vacationStatusLabels,
   vacationTypeLabels,
 } from "@/lib/people";
+import { teamColor, type TeamPalette } from "@/lib/team-color";
 import { cn } from "@/lib/utils";
 import type {
-  OrgNode,
   PersonRow,
   TriagedPerson,
   UpcomingEvent,
@@ -49,6 +49,35 @@ export function teamLabel(person: PersonRow) {
 
 export function roleTeamLine(person: PersonRow) {
   return [person.title, person.profile?.team].filter(Boolean).join(" · ");
+}
+
+/** Team name with its color, inline in a meta line. */
+export function TeamTag({
+  team,
+  palette,
+  className,
+}: {
+  team: string | null | undefined;
+  palette: TeamPalette;
+  className?: string;
+}) {
+  const color = teamColor(team, palette);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-[6px] px-1.5 py-px text-[12px] leading-[18px] font-semibold",
+        className,
+      )}
+      style={{ color: color.fg, backgroundColor: color.bg }}
+    >
+      <span
+        aria-hidden
+        className="size-1.5 rounded-full"
+        style={{ backgroundColor: color.dot }}
+      />
+      {team ?? "No team"}
+    </span>
+  );
 }
 
 // --- Status ----------------------------------------------------------------
@@ -112,9 +141,11 @@ export function StatusPill({
 /** Compact row used in the directory and other plain lists. */
 export function PersonRowItem({
   person,
+  palette,
   trailing,
 }: {
   person: PersonRow;
+  palette: TeamPalette;
   trailing?: React.ReactNode;
 }) {
   return (
@@ -130,10 +161,13 @@ export function PersonRowItem({
             <span className="ml-2 text-xs font-normal text-meta">alumni</span>
           ) : null}
         </p>
-        <p className="truncate text-[13px] text-meta">
-          {[person.title, person.profile?.team, person.profile?.location]
-            .filter(Boolean)
-            .join(" · ")}
+        <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-meta">
+          <TeamTag team={person.profile?.team} palette={palette} />
+          <span className="truncate">
+            {[person.title, person.profile?.location]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
         </p>
       </div>
       <div className="tabular shrink-0 text-right text-[13px] text-meta">
@@ -175,15 +209,18 @@ export function PersonCard({
   upcoming,
   overdue,
   canAct,
+  palette,
 }: {
   entry: TriagedPerson;
   upcoming?: UpcomingEvent;
   overdue: boolean;
   canAct: boolean;
+  palette: TeamPalette;
 }) {
   const { person, status, lastCheckIn } = entry;
-  const line = roleTeamLine(person);
-  const location = person.profile?.location;
+  const line = [person.title, person.profile?.location]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <article className="surface-interactive relative flex min-w-0 items-center gap-3 px-4 py-2.5">
       <Link
@@ -199,15 +236,18 @@ export function PersonCard({
           </p>
           <StatusPill status={status} />
         </div>
-        <p className="truncate text-[13px] text-meta">
-          {[line, location].filter(Boolean).join(" · ") || "No role set"}
-          {person.profile?.statusReason ? (
-            <span className="text-neutral-600">
-              {" · “"}
-              {person.profile.statusReason}
-              {"”"}
-            </span>
-          ) : null}
+        <p className="flex min-w-0 items-center gap-1.5 text-[13px] text-meta">
+          <TeamTag team={person.profile?.team} palette={palette} />
+          <span className="truncate">
+            {line || "No role set"}
+            {person.profile?.statusReason ? (
+              <span className="text-neutral-600">
+                {" · “"}
+                {person.profile.statusReason}
+                {"”"}
+              </span>
+            ) : null}
+          </span>
         </p>
         <p className="tabular flex min-w-0 items-center text-[13px] whitespace-nowrap text-meta">
           <span
@@ -441,57 +481,3 @@ export function VacationList({
 // --- Org -------------------------------------------------------------------
 
 /** Nested reporting tree. Indents on wide screens, stacks on mobile. */
-export function OrgTree({
-  nodes,
-  depth = 0,
-}: {
-  nodes: OrgNode[];
-  depth?: number;
-}) {
-  return (
-    <ul
-      className={cn(
-        "space-y-2.5",
-        depth > 0 && "mt-2.5 border-l-2 border-neutral-200 pl-3 sm:pl-5",
-      )}
-    >
-      {nodes.map((node) => (
-        <li key={node.person.id}>
-          <OrgCard person={node.person} reports={node.reports.length} />
-          {node.reports.length > 0 ? (
-            <OrgTree nodes={node.reports} depth={depth + 1} />
-          ) : null}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function OrgCard({ person, reports }: { person: PersonRow; reports: number }) {
-  return (
-    <Link
-      href={`/people/${person.id}`}
-      className="surface-interactive flex min-h-[64px] items-center gap-3 px-4 py-2.5"
-    >
-      <InitialsAvatar name={person.name} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold text-ink">
-          {person.name}
-        </p>
-        <p className="truncate text-[13px] text-meta">
-          {[person.title, teamLabel(person)].filter(Boolean).join(" · ")}
-        </p>
-      </div>
-      <div className="tabular shrink-0 text-right">
-        <p className="text-[13px] font-medium text-neutral-700">
-          <Tenure start={person.profile?.startDate} />
-        </p>
-        {reports > 0 ? (
-          <p className="text-[11px] text-meta">
-            {reports} report{reports === 1 ? "" : "s"}
-          </p>
-        ) : null}
-      </div>
-    </Link>
-  );
-}

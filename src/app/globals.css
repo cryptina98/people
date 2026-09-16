@@ -169,3 +169,72 @@
 summary::-webkit-details-marker {
   display: none;
 }
+
+/* Org chart connectors: each level is a row of branches; every branch draws a
+   stem up to a shared horizontal bar under its manager. */
+.org-chart {
+  --org-line: #d6d3d1;
+  --org-gap: 12px;
+  --org-stem: 20px;
+}
+.org-level {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--org-gap);
+  padding-top: 0;
+  width: max-content;
+  margin-inline: auto;
+}
+.org-children {
+  position: relative;
+  padding-top: var(--org-stem);
+  margin-top: 0;
+}
+.org-children::before {
+  /* stem from the manager down to the bar */
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: calc(var(--org-stem) / 2);
+  margin-left: -1px;
+  background: var(--org-line);
+}
+.org-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.org-children > .org-node::before {
+  /* horizontal bar segment: from this node's left edge across the gap to the
+     next sibling; the ends of the row stop at the node centre */
+  content: "";
+  position: absolute;
+  top: calc(var(--org-stem) / -2);
+  left: 0;
+  right: calc(var(--org-gap) * -1);
+  height: 2px;
+  background: var(--org-line);
+}
+.org-children > .org-node:first-child::before {
+  left: 50%;
+}
+.org-children > .org-node:last-child::before {
+  right: 50%;
+}
+.org-children > .org-node:only-child::before {
+  display: none;
+}
+.org-children > .org-node::after {
+  /* stem from the bar down to this node */
+  content: "";
+  position: absolute;
+  top: calc(var(--org-stem) / -2);
+  left: 50%;
+  width: 2px;
+  height: calc(var(--org-stem) / 2);
+  margin-left: -1px;
+  background: var(--org-line);
+}

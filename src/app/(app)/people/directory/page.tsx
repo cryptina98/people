@@ -9,6 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { requireUser } from "@/lib/auth/current-user";
 import { canManagePeople } from "@/lib/permissions";
+import { buildTeamPalette } from "@/lib/team-color";
 import { listPeople } from "@/server/people";
 
 import { PersonRowItem } from "../components";
@@ -26,6 +27,7 @@ export default async function DirectoryPage({
   const { q, alumni } = await searchParams;
 
   const all = await listPeople({ includeInactive: alumni === "1" });
+  const palette = buildTeamPalette(all.map((p) => p.profile?.team));
   const needle = q?.trim().toLowerCase();
   const people = needle
     ? all.filter((person) =>
@@ -75,7 +77,11 @@ export default async function DirectoryPage({
         ) : (
           <Card className="divide-y divide-neutral-100">
             {people.map((person) => (
-              <PersonRowItem key={person.id} person={person} />
+              <PersonRowItem
+                key={person.id}
+                person={person}
+                palette={palette}
+              />
             ))}
           </Card>
         )}
