@@ -42,7 +42,7 @@ export default async function OrgChartPage() {
     <div className="space-y-6">
       <PageHeader
         title="Org chart"
-        subtitle="Tap a name to open the profile, tap the count under a manager to expand their team. Set “Reports to” on a profile to move people."
+        subtitle="Tap a name to open the profile, tap the number next to a manager to see their team. Set “Reports to” on a profile to move people."
       />
       {tree.length === 0 ? (
         <EmptyState title="No one on the team yet" />

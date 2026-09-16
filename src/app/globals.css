@@ -177,6 +177,44 @@ summary::-webkit-details-marker {
   --org-gap: 12px;
   --org-stem: 20px;
 }
+/* Phone drill-down view: a trunk line down the left with a tick into each report. */
+.org-focus-children {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.org-focus-children.pl-5::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -12px;
+  bottom: 0;
+  width: 1px;
+  background: #d6d3d1;
+}
+.org-focus-children.pl-5 .org-focus-child {
+  position: relative;
+}
+.org-focus-children.pl-5 .org-focus-child::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 20px;
+  height: 1px;
+  background: #d6d3d1;
+}
+.org-focus-children.pl-5 .org-focus-child:last-child::after {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  bottom: 0;
+  width: 1px;
+  background: #f2f1ef;
+}
+
 .org-level {
   display: flex;
   align-items: flex-start;
